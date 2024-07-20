@@ -1,0 +1,97 @@
+#include <Keypad.h>
+#include <Servo.h>
+
+const byte ROWS = 4;
+const byte COLS = 4;
+
+char keys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+
+byte rowPins[ROWS] = {2,3,4,5};
+byte colPins[COLS] = {6, 7, 8, 9};
+
+const int forceSensorPin = A1;
+const int servoPin = 10;
+const int buzzerPin = 11;
+
+Servo myservo;
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+char password[] = "123A"; // Set your password
+char enteredPassword[5];   // Buffer for entered password
+bool isLocked = true;
+
+void setup() {
+  Serial.begin(9600);
+  myservo.attach(servoPin);
+  pinMode(buzzerPin, OUTPUT);
+  pinMode(forceSensorPin, INPUT);
+}
+
+void loop() {
+  char key = keypad.getKey();
+
+  // Handle keypad input
+  if (key != NO_KEY) {
+    if (isLocked) {
+      if (strlen(enteredPassword) < 4) {
+        enteredPassword[strlen(enteredPassword)] = key;
+      }
+    }
+  }
+
+  // Check if entered password matches the stored password
+  if (strcmp(enteredPassword, password) == 0 && isLocked) {
+    unlockSystem();
+  } else if (strlen(enteredPassword) == 4 && isLocked) {
+    handleIncorrectPassword();
+  }
+
+  // Check force sensor
+  if (isLocked) {
+    int forceValue = analogRead(forceSensorPin);
+    Serial.println(forceValue);
+    if (forceValue < 100) {
+      triggerAlarm();
+    }
+  }else{
+    digitalWrite(buzzerPin, LOW);
+  }
+}
+
+// Function to unlock the system (open servo motor)
+void unlockSystem() {
+
+  myservo.write(70);
+  delay(50); 
+  myservo.write(50);
+  delay(50); 
+  myservo.write(30);
+  delay(50); 
+  myservo.write(0); // Assuming 0 degrees is the unlocked position
+  isLocked = false;
+  Serial.println("System Unlocked");
+}
+
+// Function to handle incorrect password
+void handleIncorrectPassword() {
+  Serial.println("Incorrect Password. Please try again.");
+  digitalWrite(buzzerPin, HIGH);
+  delay(100);
+  digitalWrite(buzzerPin, LOW);
+  memset(enteredPassword, 0, sizeof(enteredPassword));
+}
+
+// Function to trigger alarm (activate buzzer)
+void triggerAlarm() {
+  Serial.println("Force Not Detected! Alarm Triggered!");
+  digitalWrite(buzzerPin, HIGH);
+  delay(1000);
+  digitalWrite(buzzerPin, LOW);
+  delay(1000);
+}
+
